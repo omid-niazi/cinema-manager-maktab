@@ -1,10 +1,9 @@
 package ir.bootcamp.cinema.service;
 
+import ir.bootcamp.cinema.exceptions.*;
 import ir.bootcamp.cinema.model.Cinema;
 import ir.bootcamp.cinema.model.ScheduledSession;
-import ir.bootcamp.cinema.model.Ticket;
 import ir.bootcamp.cinema.repositories.CinemaRepository;
-import ir.bootcamp.cinema.repositories.CustomerRepository;
 import ir.bootcamp.cinema.repositories.ScheduledSessionRepository;
 import ir.bootcamp.cinema.repositories.TicketRepository;
 
@@ -15,8 +14,9 @@ import java.sql.Time;
 import java.util.Calendar;
 import java.util.List;
 
-import static ir.bootcamp.cinema.util.ConsoleMessageType.*;
-import static ir.bootcamp.cinema.util.ConsoleUtil.*;
+import static ir.bootcamp.cinema.util.ConsoleMessageType.info;
+import static ir.bootcamp.cinema.util.ConsoleMessageType.success;
+import static ir.bootcamp.cinema.util.ConsoleUtil.print;
 
 public class CinemaService {
 
@@ -31,27 +31,23 @@ public class CinemaService {
         ticketRepository = new TicketRepository(connection);
     }
 
-    public boolean login(String username, String password) throws SQLException {
+    public void login(String username, String password) throws SQLException, UserNotFoundException, InvalidPasswordException {
         Cinema cinema = cinemaRepository.find(username);
         if (cinema == null) {
-            print("user not found", error);
-            return false;
+            throw new UserNotFoundException("user not found");
         }
         if (!cinema.getPassword().equals(password)) {
-            print("wrong password", error);
-            return false;
+            throw new InvalidPasswordException("wrong password");
         }
 
         loggedInCinema = cinema;
         print("logged in successfully", success);
-        return true;
     }
 
-    public void createCinemaAccount(String username, String password, String name, String phone, String email, String address) throws SQLException {
+    public void createCinemaAccount(String username, String password, String name, String phone, String email, String address) throws SQLException, UserExistsException {
         Cinema cinema = cinemaRepository.find(username);
         if (cinema != null) {
-            print("username exists", error);
-            return;
+            throw new UserExistsException("this usename is already taken");
         }
         cinemaRepository.add(new Cinema(0, username, password, name, phone, email, address, "pending"));
         print("account created", success);
@@ -68,16 +64,14 @@ public class CinemaService {
         }
     }
 
-    public void scheduleSession(String movieName, Date date, Time startTime, Time endTime, short capacity, long price) throws SQLException {
+    public void scheduleSession(String movieName, Date date, Time startTime, Time endTime, short capacity, long price) throws SQLException, AccessDeniedException, CinemaIsOccupyException {
         if (!loggedInCinema.getStatus().equals("verified")) {
-            print("you can't schedule a session until your account verified", error);
-            return;
+            throw new AccessDeniedException("you can't schedule a session until your account verified");
         }
 
         List<ScheduledSession> scheduled = scheduledSessionRepository.findOverlappedSessions(loggedInCinema.getId(), date, startTime, endTime);
         if (!scheduled.isEmpty()) {
-            print("another session is scheduled at this time", error);
-            return;
+            throw new CinemaIsOccupyException("another session is scheduled at this time");
         }
 
         ScheduledSession scheduledSession = new ScheduledSession(loggedInCinema, movieName, date, startTime, endTime, capacity, price);
@@ -123,21 +117,18 @@ public class CinemaService {
         print("your total income is " + sum + " $", info);
     }
 
-    public void cancelSession(int scheduledSessionId) throws SQLException {
+    public void cancelSession(int scheduledSessionId) throws SQLException, SessionNotFoundException, AccessDeniedException, SessionFinishedException {
         ScheduledSession scheduledSession = scheduledSessionRepository.find(scheduledSessionId);
         if (scheduledSession == null) {
-            print("session not found", error);
-            return;
+            throw new SessionNotFoundException("session not found");
         }
 
         if (scheduledSession.getCinema().getId() != loggedInCinema.getId()) {
-            print("this session doesn't belong to your company", error);
-            return;
+            throw new AccessDeniedException("this session doesn't belong to your company");
         }
 
         if (scheduledSession.getDate().getTime() < Calendar.getInstance().getTimeInMillis()){
-            print("this session has already been finished", error);
-            return;
+            throw new SessionFinishedException("this session has already been finished");
         }
 
         scheduledSessionRepository.delete(scheduledSessionId);

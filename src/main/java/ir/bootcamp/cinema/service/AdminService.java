@@ -1,5 +1,9 @@
 package ir.bootcamp.cinema.service;
 
+import ir.bootcamp.cinema.exceptions.CinemaNotFoundException;
+import ir.bootcamp.cinema.exceptions.InvalidPasswordException;
+import ir.bootcamp.cinema.exceptions.UserExistsException;
+import ir.bootcamp.cinema.exceptions.UserNotFoundException;
 import ir.bootcamp.cinema.model.Admin;
 import ir.bootcamp.cinema.model.Cinema;
 import ir.bootcamp.cinema.repositories.AdminRepository;
@@ -10,7 +14,8 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 
-import static ir.bootcamp.cinema.util.ConsoleMessageType.*;
+import static ir.bootcamp.cinema.util.ConsoleMessageType.info;
+import static ir.bootcamp.cinema.util.ConsoleMessageType.success;
 import static ir.bootcamp.cinema.util.ConsoleUtil.print;
 
 public class AdminService {
@@ -25,38 +30,33 @@ public class AdminService {
         transactionRepository = new TransactionRepository(connection);
     }
 
-    public boolean login(String username, String password) throws SQLException {
+    public void login(String username, String password) throws SQLException, UserNotFoundException, InvalidPasswordException {
         Admin admin = adminRepository.find(username);
         if (admin == null) {
-            print("user not found", error);
-            return false;
+            throw new UserNotFoundException("user not found");
         }
 
         if (!admin.getPassword().equals(password)) {
-            print("wrong password", error);
-            return false;
+            throw new InvalidPasswordException("wrong password");
         }
 
         loggedInAdmin = admin;
         print("logged in successfully", success);
-        return true;
     }
 
-    public void createAdminAccount(String username, String password, String name, String phone, String email) throws SQLException {
+    public void createAdminAccount(String username, String password, String name, String phone, String email) throws SQLException, UserExistsException {
         Admin admin = adminRepository.find(username);
         if (admin != null) {
-            print("username exists", error);
-            return;
+            throw new UserExistsException("username exists");
         }
-        adminRepository.add(new Admin(0, username, password,  name,phone, email));
+        adminRepository.add(new Admin(0, username, password, name, phone, email));
         print("account created", success);
     }
 
-    public void changeCinemaStatus(int cinemaId, String status) throws SQLException {
+    public void changeCinemaStatus(int cinemaId, String status) throws SQLException, CinemaNotFoundException {
         Cinema cinema = cinemaRepository.find(cinemaId);
         if (cinema == null) {
-            print("cinema not found", error);
-            return;
+            throw new CinemaNotFoundException("there is no cinema with this id");
         }
 
         cinema.setStatus(status);

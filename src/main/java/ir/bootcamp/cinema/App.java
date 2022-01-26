@@ -1,5 +1,6 @@
 package ir.bootcamp.cinema;
 
+import ir.bootcamp.cinema.exceptions.*;
 import ir.bootcamp.cinema.model.UserType;
 import ir.bootcamp.cinema.service.AdminService;
 import ir.bootcamp.cinema.service.CinemaService;
@@ -69,13 +70,23 @@ public class App {
                     login(UserType.customer);
                     break;
                 case 3:
-                    signUp(UserType.customer);
+                    try {
+                        signUp(UserType.customer);
+                    } catch (UserExistsException e) {
+                        print(e.getMessage(), error);
+                        return;
+                    }
                     break;
                 case 4:
                     login(UserType.cinema);
                     break;
                 case 5:
-                    signUp(UserType.cinema);
+                    try {
+                        signUp(UserType.cinema);
+                    } catch (UserExistsException e) {
+                        print(e.getMessage(), error);
+                        return;
+                    }
                     break;
                 case 6:
                     return;
@@ -97,7 +108,12 @@ public class App {
             scanner.nextLine();
             switch (command) {
                 case 1:
-                    signUp(UserType.admin);
+                    try {
+                        signUp(UserType.admin);
+                    } catch (UserExistsException e) {
+                        print(e.getMessage(), error);
+                        return;
+                    }
                     break;
                 case 2:
                     showRegisteredCinemas();
@@ -194,22 +210,36 @@ public class App {
         String password = scanner.nextLine();
         switch (userType) {
             case admin:
-                if (adminService.login(username, password))
-                    adminMenu();
+                try {
+                    adminService.login(username, password);
+                } catch (UserNotFoundException | InvalidPasswordException e) {
+                    print(e.getMessage(), error);
+                    return;
+                }
+                adminMenu();
                 break;
             case customer:
-                if (customerService.login(username, password))
-                    customerMenu();
+                try {
+                    customerService.login(username, password);
+                } catch (UserNotFoundException | InvalidPasswordException e) {
+                    print(e.getMessage(), error);
+                    return;
+                }
+                customerMenu();
                 break;
             case cinema:
-                if (cinemaService.login(username, password))
-                    cinemaMenu();
-
+                try {
+                    cinemaService.login(username, password);
+                } catch (UserNotFoundException | InvalidPasswordException e) {
+                    print(e.getMessage(), error);
+                    return;
+                }
+                cinemaMenu();
                 break;
         }
     }
 
-    private static void signUp(UserType userType) throws SQLException {
+    private static void signUp(UserType userType) throws SQLException, UserExistsException {
         System.out.println("enter your username: ");
         String username = scanner.nextLine();
         System.out.println("enter your password: ");
@@ -242,35 +272,56 @@ public class App {
         String dateString = scanner.nextLine();
         Date date = null;
         try {
-            date = new Date(new SimpleDateFormat("yyy-mm-dd").parse(dateString).getTime());
-        } catch (ParseException e) {
+            date = Date.valueOf(dateString);
+        } catch (Exception e) {
             print("wrong input", error);
             return;
         }
         System.out.print("enter start time (example : 06:00): ");
         String startTimeString = scanner.nextLine();
-        Time startTime = new Time(
-                Integer.parseInt(startTimeString.split(":")[0]),
-                Integer.parseInt(startTimeString.split(":")[1]),
-                0);
+        Time startTime = null;
+        try {
+            startTime = new Time(
+                    Integer.parseInt(startTimeString.split(":")[0]),
+                    Integer.parseInt(startTimeString.split(":")[1]),
+                    0);
+        } catch (Exception e) {
+            print("wrong input", error);
+            return;
+        }
         System.out.print("enter start time (example : 06:00):");
         String endTimeString = scanner.nextLine();
-        Time endTime = new Time(
-                Integer.parseInt(endTimeString.split(":")[0]),
-                Integer.parseInt(endTimeString.split(":")[1]),
-                0);
+        Time endTime = null;
+        try {
+            endTime = new Time(
+                    Integer.parseInt(endTimeString.split(":")[0]),
+                    Integer.parseInt(endTimeString.split(":")[1]),
+                    0);
+        } catch (Exception e) {
+            print("wrong input", error);
+            return;
+        }
+
         System.out.print("enter the capacity: ");
         short capacity = scanner.nextShort();
         System.out.print("enter the price: ");
         long price = scanner.nextLong();
-        cinemaService.scheduleSession(movieName, date, startTime, endTime, capacity, price);
+        try {
+            cinemaService.scheduleSession(movieName, date, startTime, endTime, capacity, price);
+        } catch (AccessDeniedException | CinemaIsOccupyException e) {
+            print(e.getMessage(), error);
+        }
     }
 
     private static void cancelSession() throws SQLException {
         System.out.print("enter session id: ");
         int sessionId = scanner.nextInt();
         scanner.nextLine();
-        cinemaService.cancelSession(sessionId);
+        try {
+            cinemaService.cancelSession(sessionId);
+        } catch (SessionNotFoundException | SessionFinishedException | AccessDeniedException e) {
+            print(e.getMessage(), error);
+        }
     }
 
     private static void showRegisteredCinemas() throws SQLException {
@@ -283,7 +334,15 @@ public class App {
         scanner.nextLine();
         System.out.print("enter new status (pending / verified / rejected): ");
         String status = scanner.nextLine();
-        adminService.changeCinemaStatus(cinemaId, status);
+        if (!status.equals("pending") && !status.equals("verified") && !status.equals("rejected")) {
+            print("wrong input", error);
+            return;
+        }
+        try {
+            adminService.changeCinemaStatus(cinemaId, status);
+        } catch (CinemaNotFoundException e) {
+            print(e.getMessage(), error);
+        }
     }
 
     private static void showAvailableSessions() throws SQLException {
@@ -294,7 +353,11 @@ public class App {
         System.out.print("enter session id: ");
         int id = scanner.nextInt();
         scanner.nextLine();
-        customerService.buyTicket(id);
+        try {
+            customerService.buyTicket(id);
+        } catch (SessionNotFoundException | SessionIsFullException | NotEnoughMoneyException e) {
+            print(e.getMessage(), error);
+        }
     }
 
     private static void searchSessionsByDate() throws SQLException {

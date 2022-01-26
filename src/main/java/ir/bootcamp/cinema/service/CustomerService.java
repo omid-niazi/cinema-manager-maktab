@@ -1,5 +1,6 @@
 package ir.bootcamp.cinema.service;
 
+import ir.bootcamp.cinema.exceptions.*;
 import ir.bootcamp.cinema.model.Customer;
 import ir.bootcamp.cinema.model.ScheduledSession;
 import ir.bootcamp.cinema.model.Ticket;
@@ -14,8 +15,9 @@ import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Time;
 
-import static ir.bootcamp.cinema.util.ConsoleUtil.*;
-import static ir.bootcamp.cinema.util.ConsoleMessageType.*;
+import static ir.bootcamp.cinema.util.ConsoleMessageType.info;
+import static ir.bootcamp.cinema.util.ConsoleMessageType.success;
+import static ir.bootcamp.cinema.util.ConsoleUtil.print;
 
 public class CustomerService {
 
@@ -33,47 +35,40 @@ public class CustomerService {
         transactionRepository = new TransactionRepository(connection);
     }
 
-    public boolean login(String username, String password) throws SQLException {
+    public void login(String username, String password) throws SQLException, UserNotFoundException, InvalidPasswordException {
         Customer customer = customerRepository.find(username);
         if (customer == null) {
-            print("user not fount", error);
-            return false;
+            throw new UserNotFoundException("user not fount");
         }
         if (!customer.getPassword().equals(password)) {
-            print("wrong password", error);
-            return false;
+            throw new InvalidPasswordException("wrong password");
 
         }
 
         loggedInCustomer = customer;
         print("logged in successfully", success);
-        return true;
     }
 
-    public void createCustomerAccount(String username, String password, String name, String phone, String email) throws SQLException {
+    public void createCustomerAccount(String username, String password, String name, String phone, String email) throws SQLException, UserExistsException {
         Customer customer = customerRepository.find(username);
         if (customer != null) {
-            print("username already exists", error);
-            return;
+            throw new UserExistsException("username already exists");
         }
         customerRepository.add(new Customer(0, username, password, name, phone, email, 0));
         print("account created", info);
     }
 
-    public void buyTicket(int scheduledSessionId) throws SQLException {
+    public void buyTicket(int scheduledSessionId) throws SQLException, SessionNotFoundException, SessionIsFullException, NotEnoughMoneyException {
         ScheduledSession scheduledSession = scheduledSessionRepository.find(scheduledSessionId);
         if (scheduledSession == null) {
-            print("session not found", error);
-            return;
+            throw new SessionNotFoundException("session not found");
         }
         if (scheduledSession.getCapacity() <= scheduledSession.getSoldTickets()) {
-            print("all session seats are sold", error);
-            return;
+            throw new SessionIsFullException("all tickets are sold");
         }
 
         if (loggedInCustomer.getBalance() < scheduledSession.getPrice()) {
-            print("your balance is not enough", error);
-            return;
+            throw new NotEnoughMoneyException("your balance is not enough");
         }
 
         Ticket ticket = new Ticket(scheduledSession, loggedInCustomer);
